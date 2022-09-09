@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
@@ -27,13 +27,9 @@ def get_info_from_graph(name: str):
 
     labels = []
     for edge in graph.edges(data=True):
-        labels.append(edge[2]['label'])
+        labels.append(edge[2]["label"])
 
-    return (
-        graph.number_of_nodes(),
-        graph.number_of_edges(),
-        labels
-    )
+    return (graph.number_of_nodes(), graph.number_of_edges(), labels)
 
 
 def save_graph_to_dot_file(graph: networkx.Graph, file_path: str):
@@ -54,7 +50,7 @@ def save_graph_to_dot_file(graph: networkx.Graph, file_path: str):
     """
     file = Path(file_path)
 
-    if file.suffix.lower() != '.dot':
+    if file.suffix.lower() != ".dot":
         raise Exception("Only dot extensions")
 
     pydot_graph = networkx.drawing.nx_pydot.to_pydot(graph)
@@ -77,8 +73,9 @@ def create_two_cycles_graph(first_count, second_count, first_label, second_label
     networkx.MultiDiGraph
         Created graph
     """
-    return cfpq_data.labeled_two_cycles_graph(first_count, second_count,
-                                              labels=(first_label, second_label))
+    return cfpq_data.labeled_two_cycles_graph(
+        first_count, second_count, labels=(first_label, second_label)
+    )
 
 
 def get_graph_by_name(name: str):

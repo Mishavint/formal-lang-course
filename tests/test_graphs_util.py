@@ -38,8 +38,12 @@ class TestsForSaveToDotFile:
             save_graph_to_dot_file(get_graph_by_name("generations"), "lololo.not_dot")
 
     def test_works_as_expected(self):
-        save_graph_to_dot_file(create_two_cycles_graph(1, 1, "11", "11"), "file_for_test.dot")
-        assert open('file_for_test.dot', 'r').read() == """digraph  {
+        save_graph_to_dot_file(
+            create_two_cycles_graph(1, 1, "11", "11"), "file_for_test.dot"
+        )
+        assert (
+            open("file_for_test.dot", "r").read()
+            == """digraph  {
 1;
 0;
 2;
@@ -49,3 +53,4 @@ class TestsForSaveToDotFile:
 2 -> 0  [key=0, label=11];
 }
 """
+        )
