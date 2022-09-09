@@ -1,3 +1,5 @@
+import os
+
 import cfpq_data
 import pytest
 from project.graphs_util import *
@@ -54,3 +56,4 @@ class TestsForSaveToDotFile:
 }
 """
         )
+        os.remove("file_for_test.dot")

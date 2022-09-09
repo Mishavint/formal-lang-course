@@ -32,4 +32,4 @@ jobs:
           fi
       - name: Run tests
         run: |
-          pytest
+          python ./scripts/run_tests.py

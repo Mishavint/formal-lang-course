@@ -18,7 +18,3 @@ def test_1():
 
 def test_2():
     assert "1" + "1" == "11"
-
-
-def test3():
-    get_info_from_graph("wine")
