@@ -1,12 +1,6 @@
 import cfpq_data
 import networkx
-import logging
 from pathlib import Path
-
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
-)
-logger = logging.getLogger(__name__)
 
 
 def get_info_from_graph(name: str):
@@ -29,7 +23,7 @@ def get_info_from_graph(name: str):
     for edge in graph.edges(data=True):
         labels.append(edge[2]["label"])
 
-    return (graph.number_of_nodes(), graph.number_of_edges(), labels)
+    return graph.number_of_nodes(), graph.number_of_edges(), labels
 
 
 def save_graph_to_dot_file(graph: networkx.Graph, file_path: str):
@@ -102,5 +96,18 @@ def get_graph_by_name(name: str):
         graph = cfpq_data.graph_from_csv(path_to_graph)
         return graph
     except FileNotFoundError as e:
-        logger.error(f"Graph with {name} name was not found")
         raise e
+
+
+def create_and_save_graph(
+    first_count, second_count, first_label, second_label, file_path: str
+):
+    save_graph_to_dot_file(
+        create_two_cycles_graph(
+            first_count,
+            second_count,
+            first_label,
+            second_label,
+        ),
+        file_path,
+    )
