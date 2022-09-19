@@ -63,7 +63,7 @@ class TestsForCreateAndSave:
         with pytest.raises(Exception):
             create_and_save_graph(1, 1, "11", "22", "lololo.not_dot")
 
-    def test_workd_as_expected(self):
+    def test_works_as_expected(self):
         create_and_save_graph(1, 1, "11", "11", "file_for_test.dot")
         assert (
             open("file_for_test.dot", "r").read()
