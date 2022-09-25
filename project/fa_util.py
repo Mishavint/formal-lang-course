@@ -2,6 +2,7 @@ from typing import Set
 from pyformlang.regular_expression import *
 from pyformlang.finite_automaton import *
 from networkx import MultiGraph
+from scipy import sparse
 
 
 def create_minimum_dfa(regex: Regex) -> DeterministicFiniteAutomaton:
@@ -10,12 +11,12 @@ def create_minimum_dfa(regex: Regex) -> DeterministicFiniteAutomaton:
     Parameters
     ----------
     regex : Regex
-            needed regex
+                    needed regex
 
     Returns
     -------
     DeterministicFiniteAutomaton
-            created dfa
+                    created dfa
     """
     enfa = regex.to_epsilon_nfa()
 
@@ -26,21 +27,21 @@ def create_ndfa_by_graph(
     graph: MultiGraph, start_states: Set[int] = None, final_states: Set[int] = None
 ) -> NondeterministicFiniteAutomaton:
     """
-            Creates a NonDeterministic Finite Automation by graph
+                    Creates a NonDeterministic Finite Automation by graph
 
     Parameters
     ----------
     graph: MultiGraph
-            needed graph
+                    needed graph
     start_states: Set[int]
-            Set of start edges
+                    Set of start edges
     final_states: Set[int]
-            Set of final edges
+                    Set of final edges
 
     Returns
     -------
     NondeterministicFiniteAutomaton
-            NDFA
+                    NDFA
     """
     ndfa = NondeterministicFiniteAutomaton()
     for edge in graph.edges(data=True):
