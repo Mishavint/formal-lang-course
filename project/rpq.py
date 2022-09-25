@@ -40,7 +40,7 @@ def rpq(
             res.add(
                 (
                     first_state // bool_matrix_for_query.num_of_states,
-                    second_state // bool_matrix_for_graph.num_of_states,
+                    second_state // bool_matrix_for_query.num_of_states,
                 )
             )
 
