@@ -1,5 +1,5 @@
 from project.fa_util import create_ndfa_by_graph, create_minimum_dfa
-from project.matrix_util import BoolMatrices
+from project.bool_matrices import BoolMatrices
 from networkx import MultiDiGraph
 from pyformlang.regular_expression import Regex
 

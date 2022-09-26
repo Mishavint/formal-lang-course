@@ -1,4 +1,4 @@
-from project.matrix_util import BoolMatrices
+from project.bool_matrices import BoolMatrices
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton
 
 
