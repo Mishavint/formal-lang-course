@@ -8,18 +8,18 @@ def rpq(
     regex: Regex, graph: MultiDiGraph, start_nodes: set = None, final_nodes: set = None
 ) -> set:
     """
-            returns set of nodes that we can reach by regex
+                    returns set of nodes that we can reach by regex
 
     Parameters
     ----------
     regex: Regex
-            needed regex
+                    needed regex
     graph: MultiDiGraph
-            needed graph
+                    needed graph
     start_nodes: set()
-            set of start nodes
+                    set of start nodes
     final_nodes: set()
-            set of final nodes
+                    set of final nodes
     """
     ndfa = create_ndfa_by_graph(graph, start_nodes, final_nodes)
     dfa = create_minimum_dfa(regex)
@@ -45,3 +45,19 @@ def rpq(
             )
 
     return res
+
+
+def bfs_rpq(
+    regex: Regex,
+    graph: MultiDiGraph,
+    separated: bool,
+    start_nodes: set = None,
+    final_nodes: set = None,
+):
+    ndfa = create_ndfa_by_graph(graph, start_nodes, final_nodes)
+    dfa = create_minimum_dfa(regex)
+
+    bool_matrix_for_graph = BoolMatrices(ndfa)
+    bool_matrix_for_query = BoolMatrices(dfa)
+
+    return bool_matrix_for_graph.constraint_bfs(bool_matrix_for_query, separated)
