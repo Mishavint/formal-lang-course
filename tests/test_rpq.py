@@ -56,16 +56,3 @@ class TestsForBfsRpq:
         graph = MultiDiGraph()
         assert bfs_rpq(Regex("Not empty regex"), graph, False) == set()
         assert bfs_rpq(Regex("Not empty regex"), graph, True) == set()
-
-    def test_empty_query(self):
-        graph = MultiDiGraph()
-        graph.add_edges_from(
-            [
-                (0, 1, {"label": "M"}),
-                (1, 2, {"label": "i"}),
-                (2, 3, {"label": "s"}),
-                (3, 4, {"label": "h"}),
-                (4, 5, {"label": "a"}),
-            ]
-        )
-        assert bfs_rpq(Regex(""), graph, False) == set()
