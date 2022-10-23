@@ -11,7 +11,12 @@ class TestsForReadFromFile:
         cfg = cfg_from_file(f"{path}/1.txt")
         assert not cfg.is_empty()
         assert cfg.terminals == {Terminal("x"), Terminal("y"), Terminal("f")}
-        assert cfg.variables == {Variable("X"), Variable("Y"), Variable("S"), Variable("F")}
+        assert cfg.variables == {
+            Variable("X"),
+            Variable("Y"),
+            Variable("S"),
+            Variable("F"),
+        }
         assert cfg.start_symbol == Variable("S")
 
     def test_missed_file(self):
