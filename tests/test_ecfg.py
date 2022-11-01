@@ -16,7 +16,7 @@ class TestsForECFG:
         assert sons[1].head.value == Symbol("f") or Symbol("g")
 
     def test_sames(self):
-        cfg = cfg_from_file("resources/cfg_files/3.txt")
+        cfg = cfg_from_file("tests/resources/cfg_files/3.txt")
         ecfg = ECFG.from_cfg(cfg)
 
         variables = []

@@ -8,7 +8,7 @@ from project.rsm import RSM
 
 class TestsForRSM:
     def test_works_as_expected(self):
-        cfg = cfg_from_file("resources/cfg_files/3.txt")
+        cfg = cfg_from_file("tests/resources/cfg_files/3.txt")
         ecfg = ECFG.from_cfg(cfg)
         rsm = RSM.create_rsm_by_ecfg(ecfg)
 
