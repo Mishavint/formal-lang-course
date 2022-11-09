@@ -10,7 +10,7 @@ class TestsForCYK:
         cfg = cfg_from_file(f"{path}/1.txt")
         res = cyk(cfg, "")
 
-        assert res == False
+        assert not res
 
     def test_works_as_expected(self):
         cfg = cfg_from_file(f"{path}/1.txt")
@@ -19,4 +19,26 @@ class TestsForCYK:
         assert res
 
         res = cyk(cfg, "yx")
-        assert res == False
+        assert not res
+
+        cfg = cfg_from_file(f"{path}/4.txt")
+
+        res = cyk(cfg, "()")
+        assert res
+
+        res = cyk(cfg, "(())")
+        assert res
+
+        res = cyk(cfg, ")(")
+        assert not res
+
+        res = cyk(cfg, "())")
+        assert not res
+
+        res = cyk(cfg, "(()")
+        assert not res
+
+        cfg = cfg_from_file(f"{path}/5.txt")
+
+        res = cyk(cfg, "baaba")
+        assert res
