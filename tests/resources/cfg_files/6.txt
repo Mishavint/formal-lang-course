@@ -1,0 +1,6 @@
+S -> M I S H A
+M -> m
+I -> i
+S -> s
+H -> h
+A -> a
