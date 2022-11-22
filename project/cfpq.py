@@ -96,7 +96,9 @@ def matrix_closure(cfg: CFG, graph: MultiDiGraph):
     nodes = list(graph.nodes)
 
     for variable in wcnf.variables:
-        bd_res_dok_matrix[variable] = sparse.dok_matrix((len(nodes), len(nodes)), dtype=numpy.int8)
+        bd_res_dok_matrix[variable] = sparse.dok_matrix(
+            (len(nodes), len(nodes)), dtype=numpy.int8
+        )
 
     for edge in graph.edges(data=True):
         label = edge[2]["label"]
@@ -120,7 +122,7 @@ def matrix_closure(cfg: CFG, graph: MultiDiGraph):
 
         for production in var_productions.items():
             for variable in production[1]:
-                bd_res[variable] += (bd_res[production[0][0]] @ bd_res[production[0][1]])
+                bd_res[variable] += bd_res[production[0][0]] @ bd_res[production[0][1]]
 
         if old_nnz == sum([v.getnnz() for v in bd_res.values()]):
             break
@@ -139,12 +141,12 @@ class CfpqAlgorithms(Enum):
 
 
 def cfpq(
-        cfg: CFG,
-        graph: MultiDiGraph,
-        start_nodes: set = None,
-        final_nodes: set = None,
-        start_symbol: Variable = Variable("S"),
-        algorithm: CfpqAlgorithms = CfpqAlgorithms.HELLINGS
+    cfg: CFG,
+    graph: MultiDiGraph,
+    start_nodes: set = None,
+    final_nodes: set = None,
+    start_symbol: Variable = Variable("S"),
+    algorithm: CfpqAlgorithms = CfpqAlgorithms.HELLINGS,
 ):
     if not start_nodes:
         start_nodes = set(graph.nodes)

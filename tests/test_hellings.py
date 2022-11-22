@@ -36,5 +36,11 @@ class TestsForHellingsCfpq:
         res = cfpq(cfg, graph, start_nodes={3}, algorithm=CfpqAlgorithms.HELLINGS)
         assert res == set()
 
-        res = cfpq(cfg, graph, start_nodes={0}, final_nodes={2, 3}, algorithm=CfpqAlgorithms.HELLINGS)
+        res = cfpq(
+            cfg,
+            graph,
+            start_nodes={0},
+            final_nodes={2, 3},
+            algorithm=CfpqAlgorithms.HELLINGS,
+        )
         assert res == {(0, 2), (0, 3)}
