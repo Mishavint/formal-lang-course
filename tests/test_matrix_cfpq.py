@@ -12,7 +12,7 @@ def generate_graph(nodes: set[int], edges: set[tuple[int, str, int]]) -> MultiDi
     return graph
 
 
-path = "resources/cfg_files"
+path = "tests/resources/cfg_files"
 
 
 class TestsForMatrixCfpq:
@@ -22,7 +22,7 @@ class TestsForMatrixCfpq:
             {(0, "m", 1), (1, "i", 2), (2, "s", 3), (3, "h", 4), (4, "a", 5)},
         )
         cfg = cfg_from_file(f"{path}/6.txt")
-        res = cfpq(cfg, graph, algorithm=CfpqAlgorithms.MATRIX)
+        res = cfpq(cfg, graph, {0}, {5}, algorithm=CfpqAlgorithms.MATRIX)
 
         assert res == {(0, 5)}
 

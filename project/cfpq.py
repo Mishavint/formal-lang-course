@@ -122,7 +122,7 @@ def matrix_closure(cfg: CFG, graph: MultiDiGraph):
             for variable in production[1]:
                 bd_res[variable] += (bd_res[production[0][0]] @ bd_res[production[0][1]])
 
-        if old_nnz != sum([v.getnnz() for v in bd_res.values()]):
+        if old_nnz == sum([v.getnnz() for v in bd_res.values()]):
             break
 
     for variable, matrix in bd_res.items():

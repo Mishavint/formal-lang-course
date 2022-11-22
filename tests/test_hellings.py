@@ -12,7 +12,7 @@ def generate_graph(nodes: set[int], edges: set[tuple[int, str, int]]) -> MultiDi
     return graph
 
 
-path = "resources/cfg_files"
+path = "tests/resources/cfg_files"
 
 
 class TestsForHellingsCfpq:
