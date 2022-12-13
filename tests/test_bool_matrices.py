@@ -1,7 +1,10 @@
+import pytest
+
 from project.bool_matrices import BoolMatrices
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton
 
 
+@pytest.mark.skip()
 class TestsForBoolMatrices:
     def test_for_transitive_closure(self):
         ndfa = NondeterministicFiniteAutomaton()

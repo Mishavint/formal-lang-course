@@ -1,8 +1,8 @@
-from collections import defaultdict
-from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State
+import numpy
+from pyformlang.finite_automaton import State, EpsilonNFA
 from scipy import sparse
 
-from project.rsm import RSM
+__all__ = ["BoolMatrices", "boolean_decompose_enfa"]
 
 
 class BoolMatrices:
@@ -10,326 +10,163 @@ class BoolMatrices:
     Class that presents NFA as Boolean Matrix
     """
 
-    def __init__(self, nfa: NondeterministicFiniteAutomaton = None):
-        if nfa is not None:
-            self.states = nfa.states
-            self.start_states = nfa.start_states
-            self.final_states = nfa.final_states
-            self.num_of_states = len(self.states)
-            self.states_indices = {
-                state: index for index, state in enumerate(nfa.states)
-            }
-            self.bool_matrices = self.init_bool_matrices_by_nfa(nfa)
-        else:
-            self.states = set()
-            self.start_states = set()
-            self.final_states = set()
-            self.num_of_states = 0
-            self.states_indices = dict()
-            self.bool_matrices = dict()
+    def __init__(self, symbols_to_matrix, states):
+        self.symbols_to_matrix = symbols_to_matrix
+        self.states_list = states
+        states_num = len(states)
+        for symbol in symbols_to_matrix.keys():
+            symbols_to_matrix[symbol] = symbols_to_matrix[symbol].todok()
+        for matrix in symbols_to_matrix.values():
+            assert (states_num, states_num) == matrix.get_shape()
 
-    def init_bool_matrices_by_nfa(self, nfa: NondeterministicFiniteAutomaton):
-        """
-                                                                        Creates boolean matrices by nfa
+    def __eq__(self, other):
+        self_dict = self.to_dict()
+        other_dict = other.to_dict()
+        if not set(self.states()) == set(other.states()):
+            return False
+        if not set(self_dict.keys()) == set(other_dict.keys()):
+            return False
+        for i in self_dict.keys():
+            nonzero_self = set(zip(*self_dict[i].nonzero()))
+            nonzero2_other = set(zip(*other_dict[i].nonzero()))
+            if not nonzero_self == nonzero2_other:
+                return False
+        return True
 
-        Parameters
-        ----------
-        nfa: NondeterministicFiniteAutomaton
-                                                                        needed nfa
-        """
-        res = dict()
-        for first_state, transition in nfa.to_dict().items():
-            for symbol, second_states in transition.items():
-                if not isinstance(second_states, set):
-                    second_states = {second_states}
-                for state in second_states:
-                    first_index = self.states_indices[first_state]
-                    second_index = self.states_indices[state]
-                    if symbol not in res:
-                        res[symbol] = sparse.csr_matrix(
-                            (self.num_of_states, self.num_of_states), dtype=bool
-                        )
-                    res[symbol][first_index, second_index] = True
-        return res
+    def states_count(self) -> int:
+        return len(self.states_list)
 
-    def to_nfa(self):
-        nfa = NondeterministicFiniteAutomaton()
-        for symbol, bm in self.bool_matrices.items():
-            for first_state, second_state in zip(*bm.nonzero()):
-                nfa.add_transition(first_state, symbol, second_state)
+    def state_index(self, state) -> int:
+        return self.states_list.index(state)
 
-        for state in self.start_states:
-            nfa.add_start_state(state)
+    def states(self) -> list[State]:
+        return self.states_list
 
-        for state in self.final_states:
-            nfa.add_final_state(state)
+    _convert_to_spmatrix = lambda mat: mat.tocsr()
 
-        return nfa
+    def to_dict(self):
+        d = dict()
+        for (symbol, matrix) in self.symbols_to_matrix.items():
+            d[symbol] = BoolMatrices._convert_to_spmatrix(matrix)
+        return d
 
-    def intersect(self, other: "BoolMatrices"):
-        res = BoolMatrices()
-        res.num_of_states = self.num_of_states * other.num_of_states
-        symbols = self.bool_matrices.keys() & other.bool_matrices.keys()
-
+    def kron(self, other: "BoolMatrices") -> "BoolMatrices":
+        intersection_decomposition = dict()
+        dict1 = self.to_dict()
+        dict2 = other.to_dict()
+        symbols = set(dict1.keys()).union(set(dict2.keys()))
         for symbol in symbols:
-            res.bool_matrices[symbol] = sparse.kron(
-                self.bool_matrices[symbol], other.bool_matrices[symbol], format="csr"
+            if symbol in dict1:
+                coo_matrix1 = dict1[symbol]
+            else:
+                coo_matrix1 = sparse.coo_matrix(
+                    (self.states_count(), self.states_count())
+                )
+
+            if symbol in dict2:
+                coo_matrix2 = dict2[symbol]
+            else:
+                coo_matrix2 = sparse.coo_matrix(
+                    (other.states_count(), other.states_count())
+                )
+
+            intersection_decomposition[symbol] = sparse.kron(
+                BoolMatrices._convert_to_spmatrix(coo_matrix1),
+                BoolMatrices._convert_to_spmatrix(coo_matrix2),
             )
 
-        for first_state, first_index in self.states_indices.items():
-            for second_state, second_index in other.states_indices.items():
-                state_index = first_index * other.num_of_states + second_index
-                res.states_indices[state_index] = state_index
+        intersection_states = list()
+        for state1 in self.states():
+            for state2 in other.states():
+                intersection_states.append(State((state1, state2)))
 
-                state = state_index
-                if (
-                    first_state in self.start_states
-                    and second_state in other.start_states
-                ):
-                    res.start_states.add(state)
-                if (
-                    first_state in self.final_states
-                    and second_state in other.final_states
-                ):
-                    res.final_states.add(state)
+        return BoolMatrices(intersection_decomposition, intersection_states)
 
-        return res
+    def transitive_closure(self) -> sparse.spmatrix:
+        """
+        :return: adjacency matrix of states corresponding to transitive closure
+        """
+        adjacency_matrix = sum(
+            self.symbols_to_matrix.values(),
+            sparse.coo_matrix((self.states_count(), self.states_count())),
+        )
 
-    def transitive_closure(self):
-        if len(self.bool_matrices) == 0:
-            return sparse.csr_matrix((0, 0), dtype=bool)
-        tc = sum(self.bool_matrices.values())
+        adjacency_matrix = BoolMatrices._convert_to_spmatrix(adjacency_matrix)
 
-        prev = tc.nnz
-        curr = 0
+        last_values_count = 0
+        while last_values_count != adjacency_matrix.nnz:
+            last_values_count = adjacency_matrix.nnz
+            adjacency_matrix += adjacency_matrix @ adjacency_matrix
 
-        while prev != curr:
-            tc += tc @ tc
-            prev = curr
-            curr = tc.nnz
+        return adjacency_matrix
 
-        return tc
-
-    def get_start_states(self):
-        return self.start_states
-
-    def get_final_states(self):
-        return self.final_states
-
-    def constraint_bfs(self, other: "BoolMatrices", separate: bool = False):
-        direct_sum = other.direct_sum(self)
-        n = self.num_of_states
-        k = other.num_of_states
-
-        start_states_indices = [
-            index
-            for index, state in enumerate(self.states)
-            if state in self.start_states
-        ]
-        final_states_indices = [
-            index
-            for index, state in enumerate(self.states)
-            if state in self.final_states
-        ]
-        other_final_states_indices = [
-            index
-            for index, state in enumerate(other.states)
-            if state in other.final_states
-        ]
-
-        if not separate:
-            front = self.make_front(other)
-        else:
-            front = self.make_separated_front(other)
-
-        visited = sparse.csr_matrix(front.shape)
-
-        while True:
-            old_visited = visited.copy()
-
-            for _, matrix in direct_sum.bool_matrices.items():
-                if front is not None:
-                    front2 = front @ matrix
-                else:
-                    front2 = visited @ matrix
-
-                visited += self.transform_front(front2, other)
-
-            front = None
-
-            if visited.nnz == old_visited.nnz:
-                break
-
-        result = set()
-        for i, j in zip(*visited.nonzero()):
-            if j >= k and i % k in other_final_states_indices:
-                if j - k in final_states_indices:
-                    if not separate:
-                        result.add(j - k)
-                    else:
-                        result.add((start_states_indices[i // n], j - k))
-
-        return result
-
-    def direct_sum(self, other: "BoolMatrices"):
-        result = BoolMatrices()
-        bool_matrices = {}
-        symbols = self.bool_matrices.keys() & other.bool_matrices.keys()
-
+    def direct_sum(self, other: "BoolMatrices") -> "BoolMatrices":
+        direct_sum_decomposition = dict()
+        dict1 = self.to_dict()
+        dict2 = other.to_dict()
+        symbols = set(dict1.keys()).union(set(dict2.keys()))
+        self_states_count = self.states_count()
+        other_states_count = other.states_count()
         for symbol in symbols:
-            bool_matrices[symbol] = sparse.bmat(
-                [
-                    [self.bool_matrices[symbol], None],
-                    [None, other.bool_matrices[symbol]],
-                ]
+            if symbol in dict1:
+                coo_matrix1 = dict1[symbol].tocsr()
+            else:
+                coo_matrix1 = sparse.csr_matrix((self_states_count, self_states_count))
+
+            if symbol in dict2:
+                coo_matrix2 = dict2[symbol].tocsr()
+            else:
+                coo_matrix2 = sparse.csr_matrix(
+                    (other_states_count, other_states_count)
+                )
+            direct_sum_decomposition[symbol] = sparse.coo_matrix(
+                (
+                    self_states_count + other_states_count,
+                    self_states_count + other_states_count,
+                )
+            )
+            data = [coo_matrix1[i, j] for (i, j) in zip(*coo_matrix1.nonzero())] + [
+                coo_matrix2[i, j] for (i, j) in zip(*coo_matrix2.nonzero())
+            ]
+            row = [i for (i, _) in zip(*coo_matrix1.nonzero())] + [
+                self_states_count + i for (i, _) in zip(*coo_matrix2.nonzero())
+            ]
+            col = [j for (_, j) in zip(*coo_matrix1.nonzero())] + [
+                self_states_count + j for (_, j) in zip(*coo_matrix2.nonzero())
+            ]
+            shape_width = self_states_count + other_states_count
+            direct_sum_decomposition[symbol] = sparse.coo_matrix(
+                (data, (row, col)), shape=(shape_width, shape_width)
             )
 
-        start_states = {
-            State(state.value + self.num_of_states) for state in other.start_states
-        }
-        final_states = {
-            State(state.value + self.num_of_states) for state in other.final_states
-        }
+        return BoolMatrices(direct_sum_decomposition, self.states() + other.states())
 
-        for _, first_index in self.states_indices.items():
-            for _, second_index in other.states_indices.items():
-                state = first_index * other.num_of_states + second_index
-                result.states_indices[state] = state
 
-        if not isinstance(self.start_states, set):
-            self.start_states = set()
-        result.states = self.states | set(
-            (State(state.value + self.num_of_states) for state in other.states)
-        )
-        result.num_of_states = self.num_of_states + other.num_of_states
-        result.start_states = self.start_states | start_states
-        result.final_states = self.final_states | final_states
-
-        result.bool_matrices = bool_matrices
-
-        return result
-
-    def make_front(self, other: "BoolMatrices"):
-        n = self.num_of_states
-        k = other.num_of_states
-
-        front = sparse.lil_matrix((k, n + k))
-
-        right_part = sparse.lil_array(
-            [[state in self.start_states for state in self.states]]
-        )
-
-        for _, index in other.states_indices.items():
-            front[index, index] = True
-            front[index, k:] = right_part
-
-        return front.tocsr()
-
-    def make_separated_front(self, other: "BoolMatrices"):
-        start_indices = {
-            index
-            for index, state in enumerate(self.states)
-            if state in self.start_states
-        }
-        fronts = [self.make_front(other) for _ in start_indices]
-
-        if len(fronts) > 0:
-            return sparse.csr_matrix(sparse.vstack(fronts))
-        else:
-            return sparse.csr_matrix(
-                (other.num_of_states, other.num_of_states + self.num_of_states)
-            )
-
-    def transform_front(self, part: sparse.csr_matrix, other: "BoolMatrices"):
-        transformed_part = sparse.lil_array(part.shape)
-
-        for i, j in zip(*part.nonzero()):
-            if j < other.num_of_states:
-                non_zero_right = part.getrow(i).tolil()[[0], other.num_of_states :]
-
-                if non_zero_right.nnz > 0:
-                    shift_row = i // other.num_of_states * other.num_of_states
-                    transformed_part[shift_row + j, j] = 1
-                    transformed_part[
-                        [shift_row + j], other.num_of_states :
-                    ] += non_zero_right
-
-        return transformed_part.tocsr()
-
-    def create_by_rsm(self, rsm: RSM):
-        states = set()
-        start_states = set()
-        final_states = set()
-
-        for var, nfa in rsm.boxes.items():
-            for state in nfa.states:
-                st = State((var, state.value))
-                states.add(st)
-                if state in nfa.start_states:
-                    start_states.add(st)
-                if state in nfa.final_states:
-                    final_states.add(st)
-
-        states = sorted(states, key=lambda s: s.value[1])
-        state_to_index = {state: i for i, state in enumerate(states)}
-
-        bm = defaultdict(
-            lambda: sparse.dok_matrix((len(states), len(states)), dtype=bool)
-        )
-
-        for var, nfa in rsm.boxes.items():
-            for first_state, transitions in nfa.to_dict().items():
-                for variable, second_states in transitions.items():
-                    m = bm[variable.value]
-                    second_states = (
-                        second_states
-                        if isinstance(second_states, set)
-                        else {second_states}
+def boolean_decompose_enfa(enfa: EpsilonNFA) -> "BoolMatrices":
+    states_data = list(enfa.states)
+    boolean_decompose = dict()
+    for (u, symbol_and_vs) in enfa.to_dict().items():
+        for (symbol, vs) in symbol_and_vs.items():
+            if symbol not in boolean_decompose:
+                boolean_decompose[symbol] = list()
+            if not type(vs) is set:  # vs is one state in this case
+                boolean_decompose[symbol].append(
+                    (states_data.index(u), states_data.index(vs))
+                )
+            else:
+                for v in vs:
+                    boolean_decompose[symbol].append(
+                        (states_data.index(u), states_data.index(v))
                     )
-                    for second_state in second_states:
-                        m[
-                            state_to_index[State((var, first_state.value))],
-                            state_to_index[State((var, second_state.value))],
-                        ] = True
 
-        res = BoolMatrices()
-        res.start_states = start_states
-        res.final_states = final_states
-        res.states_indices = state_to_index
-        res.bool_matrices = bm
-        return res
+    states_num = len(enfa.states)
+    coo_matrices = dict()
+    for (symbol, edges) in boolean_decompose.items():
+        row = numpy.array([i for (i, _) in edges])
+        col = numpy.array([j for (_, j) in edges])
+        data = numpy.array([1 for _ in range(len(edges))])
+        coo_matrices[symbol] = sparse.coo_matrix(
+            (data, (row, col)), shape=(states_num, states_num)
+        )
 
-    def __and__(self, other: "BoolMatrices"):
-        inter_labels = self.bool_matrices.keys() & other.bool_matrices.keys()
-        inter_bm = {
-            label: sparse.kron(self.bool_matrices[label], other.bool_matrices[label])
-            for label in inter_labels
-        }
-
-        inter_states_indices = dict()
-        inter_start_states = set()
-        inter_final_states = set()
-
-        for self_state, self_idx in self.states_indices.items():
-            for other_state, other_idx in other.states_indices.items():
-                state = State((self_state.value, other_state.value))
-                idx = self_idx * len(other.states_indices) + other_idx
-                inter_states_indices[state] = idx
-                if (
-                    self_state in self.start_states
-                    and other_state in other.start_states
-                ):
-                    inter_start_states.add(state)
-                if (
-                    self_state in self.final_states
-                    and other_state in other.final_states
-                ):
-                    inter_final_states.add(state)
-
-        res = BoolMatrices()
-        res.start_states = inter_start_states
-        res.final_states = inter_final_states
-        res.states_indices = inter_states_indices
-        res.bool_matrices = inter_bm
-
-        return res
+    return BoolMatrices(coo_matrices, states_data)
