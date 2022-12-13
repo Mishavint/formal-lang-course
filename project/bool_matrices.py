@@ -1,8 +1,8 @@
-from networkx import MultiDiGraph
+from collections import defaultdict
 from pyformlang.finite_automaton import NondeterministicFiniteAutomaton, State
-from pyformlang.regular_expression import Regex
 from scipy import sparse
-from project.fa_util import create_ndfa_by_graph, create_minimum_dfa
+
+from project.rsm import RSM
 
 
 class BoolMatrices:
@@ -255,3 +255,81 @@ class BoolMatrices:
                     ] += non_zero_right
 
         return transformed_part.tocsr()
+
+    def create_by_rsm(self, rsm: RSM):
+        states = set()
+        start_states = set()
+        final_states = set()
+
+        for var, nfa in rsm.boxes.items():
+            for state in nfa.states:
+                st = State((var, state.value))
+                states.add(st)
+                if state in nfa.start_states:
+                    start_states.add(st)
+                if state in nfa.final_states:
+                    final_states.add(st)
+
+        states = sorted(states, key=lambda s: s.value[1])
+        state_to_index = {state: i for i, state in enumerate(states)}
+
+        bm = defaultdict(
+            lambda: sparse.dok_matrix((len(states), len(states)), dtype=bool)
+        )
+
+        for var, nfa in rsm.boxes.items():
+            for first_state, transitions in nfa.to_dict().items():
+                for variable, second_states in transitions.items():
+                    m = bm[variable.value]
+                    second_states = (
+                        second_states
+                        if isinstance(second_states, set)
+                        else {second_states}
+                    )
+                    for second_state in second_states:
+                        m[
+                            state_to_index[State((var, first_state.value))],
+                            state_to_index[State((var, second_state.value))],
+                        ] = True
+
+        res = BoolMatrices()
+        res.start_states = start_states
+        res.final_states = final_states
+        res.states_indices = state_to_index
+        res.bool_matrices = bm
+        return res
+
+    def __and__(self, other: "BoolMatrices"):
+        inter_labels = self.bool_matrices.keys() & other.bool_matrices.keys()
+        inter_bm = {
+            label: sparse.kron(self.bool_matrices[label], other.bool_matrices[label])
+            for label in inter_labels
+        }
+
+        inter_states_indices = dict()
+        inter_start_states = set()
+        inter_final_states = set()
+
+        for self_state, self_idx in self.states_indices.items():
+            for other_state, other_idx in other.states_indices.items():
+                state = State((self_state.value, other_state.value))
+                idx = self_idx * len(other.states_indices) + other_idx
+                inter_states_indices[state] = idx
+                if (
+                    self_state in self.start_states
+                    and other_state in other.start_states
+                ):
+                    inter_start_states.add(state)
+                if (
+                    self_state in self.final_states
+                    and other_state in other.final_states
+                ):
+                    inter_final_states.add(state)
+
+        res = BoolMatrices()
+        res.start_states = inter_start_states
+        res.final_states = inter_final_states
+        res.states_indices = inter_states_indices
+        res.bool_matrices = inter_bm
+
+        return res
