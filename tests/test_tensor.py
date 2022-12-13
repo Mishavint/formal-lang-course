@@ -13,6 +13,9 @@ def generate_graph(nodes: set[int], edges: set[tuple[int, str, int]]) -> MultiDi
     return graph
 
 
+path = "tests/resources/cfg_files"
+
+
 class TestsForTensorCfpq:
     def test_works_as_expected_1(self):
         graph = create_two_cycles_graph(1, 1, "a", "b")
@@ -22,9 +25,9 @@ class TestsForTensorCfpq:
         S -> a S
         """
         )
-        res = cfpq(cfg, graph, algorithm=CfpqAlgorithms.MATRIX)
-
-        assert res == {(1, 0), (0, 1)} or res == set()
+        res = cfpq(cfg, graph, algorithm=CfpqAlgorithms.TENSOR)
+        tt = graph.edges(data=True)
+        assert res == {(1, 0), (0, 1), (1, 1), (0, 0)}
 
     def test_works_as_expected_2(self):
         graph = generate_graph(
@@ -58,5 +61,5 @@ class TestsForTensorCfpq:
         """
         )
 
-        res = cfpq(cfg, graph, algorithm=CfpqAlgorithms.MATRIX)
+        res = cfpq(cfg, graph, algorithm=CfpqAlgorithms.TENSOR)
         assert res == {(1, 2), (2, 1)}

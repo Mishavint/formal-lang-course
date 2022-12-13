@@ -1,6 +1,7 @@
 import cfpq_data
 import networkx
 from pathlib import Path
+from pyformlang.finite_automaton import EpsilonNFA, State, Symbol
 
 
 def get_info_from_graph(name: str):
@@ -111,3 +112,21 @@ def create_and_save_graph(
         ),
         file_path,
     )
+
+
+def create_nfa_by_graph(
+    graph: networkx.MultiDiGraph, start_states=None, final_states=None
+):
+    enfa = EpsilonNFA()
+
+    for u, v, ddict in graph.edges(data=True):
+        label = ddict["label"]
+        enfa.add_transition(State(u), Symbol(label), State(v))
+
+    for node in graph.nodes:
+        if not start_states or node in start_states:
+            enfa.add_start_state(State(node))
+        if not final_states or node in final_states:
+            enfa.add_final_state(State(node))
+
+    return enfa

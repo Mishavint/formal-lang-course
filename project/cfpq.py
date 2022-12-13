@@ -1,14 +1,19 @@
+from functools import reduce
+
 from networkx import MultiDiGraph
 from pyformlang.cfg import CFG, Variable
+from pyformlang.finite_automaton import Symbol, State
 from pyformlang.finite_automaton import EpsilonNFA
 from enum import Enum
 from scipy import sparse
 import numpy
 
 from project.cfg_util import create_wcnf_by_cfg
+from project.fa_util import get_edges_by_enfa
+from project.graphs_util import create_nfa_by_graph
 from project.rsm import RSM
 from project.ecfg import ECFG
-from project.bool_matrices import BoolMatrices
+from project.bool_matrices import BoolMatrices, boolean_decompose_enfa
 
 
 def hellings_closure(cfg: CFG, graph: MultiDiGraph):
@@ -139,48 +144,104 @@ def matrix_closure(cfg: CFG, graph: MultiDiGraph):
     return res
 
 
-def tensor_closure(cfg: CFG, graph: MultiDiGraph):
-    ecfg = ECFG.from_cfg(cfg)
-    rsm = RSM.create_rsm_by_ecfg(ecfg)
+def tensor_closure(cfg: CFG, graph) -> set[tuple[any, Variable, any]]:
+    if cfg.productions == set():
+        return set()
+    automata = RSM.create_rsm_by_ecfg(ECFG.from_cfg(cfg))
+    variables = cfg.variables
+    terminals = cfg.terminals
+    start_states = reduce(
+        lambda acc, l: acc + l,
+        [
+            list(zip(a.start_states, [var for _ in range(len(a.start_states))]))
+            for var, a in automata.var_to_automata.items()
+        ],
+    )
+    final_states = reduce(
+        lambda acc, l: acc + l,
+        [
+            list(zip(a.final_states, [var for _ in range(len(a.final_states))]))
+            for var, a in automata.var_to_automata.items()
+        ],
+    )
+    all_states = reduce(
+        lambda acc, l: acc + l,
+        [
+            list(zip(a.states, [var for _ in range(len(a.states))]))
+            for var, a in automata.var_to_automata.items()
+        ],
+    )
 
-    rbm = BoolMatrices().create_by_rsm(rsm)
-    index_to_state = {i: st for st, i in rbm.states_indices.items()}
+    # boolean decompose graph and cfg`s recursive automata
+    automata_size = len(all_states)
+    symbol_to_matrix = dict()
+    for var in variables:
+        mat = sparse.dok_matrix((automata_size, automata_size), dtype=numpy.int32)
+        for enfa_var, enfa in automata.var_to_automata.items():
+            for (v, symbol, u) in get_edges_by_enfa(enfa):
+                if var.value == symbol.value:
+                    mat[
+                        all_states.index((v, enfa_var)), all_states.index((u, enfa_var))
+                    ] = 1
+        symbol_to_matrix[Symbol(var.value)] = mat
+    for term in terminals:
+        mat = sparse.dok_matrix((automata_size, automata_size), dtype=numpy.int32)
+        for enfa_var, enfa in automata.var_to_automata.items():
+            for (v, symbol, u) in get_edges_by_enfa(enfa):
+                if term.value == symbol.value:
+                    mat[
+                        all_states.index((v, enfa_var)), all_states.index((u, enfa_var))
+                    ] = 1
+        symbol_to_matrix[Symbol(term.value)] = mat
 
-    graph_bm = BoolMatrices(EpsilonNFA.from_networkx(graph))
-    graph_bm_size = len(graph_bm.states_indices)
-    graph_state_indicies = {i: st for st, i in graph_bm.states_indices.items()}
-    loop_m = sparse.eye(len(graph_bm.states_indices), dtype=bool).todok()
+    boolean_decomposition_automata = BoolMatrices(
+        symbol_to_matrix, list(map(lambda s: State(s), all_states))
+    )
+    boolean_decomposition_graph = boolean_decompose_enfa(create_nfa_by_graph(graph))
 
-    for nonterm in cfg.get_nullable_symbols():
-        graph_bm.bool_matrices[nonterm.value] += loop_m
-    old_sz = 0
+    # add new edges in initial graph with epsilon variables
+    result = set()
 
+    graph_size = len(graph.nodes)
+    graph_nodes = list(graph.nodes)
+    for production in cfg.productions:
+        if len(production.body) == 0:
+            symbol = Symbol(production.head.value)
+            symbols_to_matrix = boolean_decomposition_graph.symbols_to_matrix
+            if symbol not in symbols_to_matrix:
+                symbols_to_matrix[symbol] = sparse.dok_matrix(
+                    (graph_size, graph_size), dtype=numpy.int32
+                )
+            for i in range(graph_size):
+                symbols_to_matrix[symbol][i, i] = 1
+                result.add((graph_nodes[i], production.head, graph_nodes[i]))
+
+    # algorithm
     while True:
-        intersection = rbm & graph_bm
-        tc_indices = list(zip(*intersection.transitive_closure().nonzero()))
-        if len(tc_indices) == old_sz:
+        result_size = len(result)
+        kron_decomposition = boolean_decomposition_automata.kron(
+            boolean_decomposition_graph
+        )
+        transitive_closure = kron_decomposition.transitive_closure()
+        for (i, j) in zip(*transitive_closure.nonzero()):
+            (s, x) = kron_decomposition.states()[i].value
+            (f, y) = kron_decomposition.states()[j].value
+            if s.value in start_states and f.value in final_states:
+                symbol = Symbol(s.value[1])
+                if symbol not in boolean_decomposition_graph.symbols_to_matrix:
+                    boolean_decomposition_graph.symbols_to_matrix[
+                        symbol
+                    ] = sparse.dok_matrix((graph_size, graph_size), dtype=numpy.int32)
+                boolean_decomposition_graph.symbols_to_matrix[symbol][
+                    boolean_decomposition_graph.state_index(x.value),
+                    boolean_decomposition_graph.state_index(y.value),
+                ] = 1
+                result.add((x.value, s.value[1], y.value))
+
+        if len(result) == result_size:
             break
-        old_sz = len(tc_indices)
 
-        for i, j in tc_indices:
-            cfg_i = i // graph_bm_size
-            cfg_j = j // graph_bm_size
-            graph_i = i % graph_bm_size
-            graph_j = j % graph_bm_size
-
-            first_state = index_to_state[cfg_i]
-            second_state = index_to_state[cfg_j]
-
-            nonterm, _ = first_state.value
-
-            if first_state in rbm.start_states and second_state in rbm.final_states:
-                graph_bm.bool_matrices[nonterm][graph_i, graph_j] = True
-
-    return {
-        (graph_state_indicies[graph_i], nonterm, graph_state_indicies[graph_j])
-        for nonterm, mtx in graph_bm.bool_matrices.items()
-        for graph_i, graph_j in zip(*mtx.nonzero())
-    }
+    return result
 
 
 class CfpqAlgorithms(Enum):

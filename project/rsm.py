@@ -13,9 +13,13 @@ class RSM:
             boxes[key] = fa.minimize()
         return RSM(start_symbol=self.start_symbol, boxes=boxes)
 
+    @property
+    def var_to_automata(self):
+        return self.boxes
+
     @classmethod
     def create_rsm_by_ecfg(self, ecfg: ECFG):
         boxes = {}
         for var, regex in ecfg.productions.items():
-            boxes[var] = regex.to_epsilon_nfa()
+            boxes[var] = regex.to_epsilon_nfa().minimize()
         return RSM(start_symbol=ecfg.start_symbol, boxes=boxes)

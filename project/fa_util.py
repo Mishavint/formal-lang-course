@@ -61,3 +61,16 @@ def create_ndfa_by_graph(
             ndfa.add_final_state(State(state))
 
     return ndfa
+
+
+def get_edges_by_enfa(enfa: EpsilonNFA):
+    res = set()
+    for (u, symbol_and_vs) in enfa.to_dict().items():
+        for (symbol, vs) in symbol_and_vs.items():
+            if not type(vs) is set:
+                res.add((u, symbol, vs))
+            else:
+                for v in vs:
+                    res.add((u, symbol, v))
+
+    return res
