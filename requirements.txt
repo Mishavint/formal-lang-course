@@ -3,6 +3,7 @@ black
 cfpq-data
 networkx
 numpy
+pandas
 pre-commit
 pydot
 pyformlang
